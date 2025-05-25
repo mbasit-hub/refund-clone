@@ -423,7 +423,7 @@ fpca.face <- function(Y=NULL, ydata=NULL, Y.pred=NULL, argvals=NULL,
   
   #Yhat <- Phi.N %*% Xi
   G_invhalfAXi <- A.N%*%Xi
-  Yhat <- t(as.matrix(B%*%G_invhalfAXi))
+  Yhat <- as.matrix(B%*%G_invhalfAXi)
   Yhat <- t(Yhat + meanX)
   
   scores <- t(Xi)
