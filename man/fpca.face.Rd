@@ -96,7 +96,16 @@ A list with components
 \item \code{npc} - number of principal components
 \item \code{efunctions} - matrix of eigenvectors
 \item \code{evalues} - vector of eigenvalues
-\item \code{pve} - The percent variance explained by the returned number of PCs
+\item \code{pve} - the percent variance explained by the returned number of PCs
+\item \code{mean.fit} - an object of class \code{\link[stats]{smooth.spline}}; used to center the observed functional data if \code{center == TRUE}
+\item \code{argvals} - the supplied value of \code{argvals}
+\item \code{knots} - vector of knots used to specify the B-spline basis
+\item \code{p} - the supplied value of \code{p}
+\item \code{m} - the supplied value of \code{m}
+\item \code{G} - matrix of the integral of B-spline basis function products; used for orthonormalization
+\item \code{G_invhalf} - the inverse square root of \code{G}
+\item \code{G_invhalfA} - matrix producct of \code{G_invhalf} and the eigenvectors of the smoothed data
+\item \code{Theta} - matrix of estimated smoothing coefficients
 }
 if \code{var == TRUE} additional components are returned
 \enumerate{
@@ -184,5 +193,6 @@ smoothing of \code{Y}; \code{\link{fpca2s}} and \code{\link{fpca.ssvd}}
 for two SVD-based smoothings.
 }
 \author{
-Luo Xiao
+Luo Xiao \email{lxiao5@ncsu.edu}, Ruonan Li \email{rli20@ncsu.edu},
+   Md Abdul Basit \email{mbasit@ncsu.edu}
 }

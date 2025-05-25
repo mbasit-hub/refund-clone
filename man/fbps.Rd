@@ -122,5 +122,5 @@ Xiao, L., Li, Y., and Ruppert, D. (2013). Fast bivariate
 Statistical Society: Series B}, 75(3), 577--599.
 }
 \author{
-Luo Xiao \email{lxiao@jhsph.edu}
+Luo Xiao \email{lxiao5@ncsu.edu}
 }

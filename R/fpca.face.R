@@ -64,7 +64,16 @@
 #' \item \code{npc} - number of principal components
 #' \item \code{efunctions} - matrix of eigenvectors
 #' \item \code{evalues} - vector of eigenvalues
-#' \item \code{pve} - The percent variance explained by the returned number of PCs
+#' \item \code{pve} - the percent variance explained by the returned number of PCs
+#' \item \code{mean.fit} - an object of class \code{\link[stats]{smooth.spline}}; used to center the observed functional data if \code{center == TRUE}
+#' \item \code{argvals} - the supplied value of \code{argvals}
+#' \item \code{knots} - vector of knots used to specify the B-spline basis
+#' \item \code{p} - the supplied value of \code{p}
+#' \item \code{m} - the supplied value of \code{m}
+#' \item \code{G} - matrix of the integral of B-spline basis function products; used for orthonormalization
+#' \item \code{G_invhalf} - the inverse square root of \code{G}
+#' \item \code{G_invhalfA} - matrix producct of \code{G_invhalf} and the eigenvectors of the smoothed data
+#' \item \code{Theta} - matrix of estimated smoothing coefficients
 #' }
 #' if \code{var == TRUE} additional components are returned
 #' \enumerate{
@@ -75,7 +84,8 @@
 #' \item \code{crit.val} - list of estimated quantiles; only returned if
 #' \code{simul == TRUE}
 #' }
-#' @author Luo Xiao
+#' @author Luo Xiao \email{lxiao5@@ncsu.edu}, Ruonan Li \email{rli20@@ncsu.edu},
+#'    Md Abdul Basit \email{mbasit@@ncsu.edu}
 #' @seealso   \code{\link{fpca.sc}}  for another covariance-estimate based
 #' smoothing of \code{Y}; \code{\link{fpca2s}} and \code{\link{fpca.ssvd}}
 #' for two SVD-based smoothings.
@@ -145,14 +155,14 @@
 #' @importFrom stats smooth.spline optim
 #' @importFrom Matrix as.matrix
 #' @importFrom MASS mvrnorm
-fpca.face <-
-function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
-         var = FALSE, simul = FALSE, sim.alpha = 0.95,
-         center=TRUE,knots=35,p=3,m=2,lambda=NULL,alpha = 1,
-         search.grid=TRUE,search.length=100,
-         method="L-BFGS-B", lower=-20,upper=20, control=NULL,
-         periodicity = FALSE){
-
+fpca.face <- function(Y=NULL, ydata=NULL, Y.pred=NULL, argvals=NULL,
+                       pve=0.99, npc=NULL,
+                       var=FALSE, simul=FALSE, sim.alpha=0.95,
+                       center=TRUE, knots=35, p=3, m=2, lambda=NULL, alpha=1,
+                       search.grid=TRUE, search.length=100,
+                       method="L-BFGS-B", lower=-20, upper=20, control=NULL,
+                       periodicity=FALSE){
+  
   ## data: Y, I by J data matrix, functions on rows
   ## argvals:  vector of J
   ## knots: to specify either the number of knots or the vectors of knots;
@@ -169,23 +179,24 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
   data_dim <- dim(Y)
   I <- data_dim[1] ## number of subjects
   J <- data_dim[2] ## number of obs per function
-
+  
   if(is.null(argvals))  argvals <- (1:J)/J-1/2/J ## if NULL, assume equally spaced
-
+  
   meanX <- rep(0,J)
   if(center) {##center the functions
     meanX <- colMeans(Y, na.rm=TRUE)
-    meanX <- smooth.spline(argvals,meanX,all.knots =TRUE)$y
+    mean.fit <- smooth.spline(argvals,meanX,all.knots =TRUE)
+    meanX <- mean.fit$y
     Y <- t(t(Y)- meanX)
   }
-
+  
   ## specify the B-spline basis: knots
   p.p <- p
   m.p <- m
   if(length(knots)==1){
     if(knots+p.p>=J) cat("Too many knots!\n")
     stopifnot(knots+p.p<J)
-
+    
     K.p <- knots
     knots <- seq(-p.p,K.p+p.p,length=K.p+1+2*p.p)/K.p
     knots <- knots*(max(argvals)-min(argvals)) + min(argvals)
@@ -194,9 +205,9 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
   if(K.p>=J) cat("Too many knots!\n")
   stopifnot(K.p <J)
   c.p <- K.p + p.p
-
+  
   ######### precalculation for smoothing #############
-  List <- pspline.setting(argvals,knots,p.p,m.p, periodicity=periodicity)
+  List <- pspline.setting(argvals,knots,p.p,m.p,periodicity=periodicity)
   B <- List$B
   Bt <- Matrix(t(as.matrix(B)))
   s <- List$s
@@ -209,14 +220,25 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
     if(option==1)
       return(A*(rep(1,dim(A)[1])%*%t(s)))
   }
-
+  
+  
+  G <- crossprod(B)/nrow(B)
+  argvals.dense <- seq(min(argvals),max(argvals),length = 10000)
+  B.dense <- spline.des(knots=knots, x=argvals.dense, ord = p.p+1,outer.ok = TRUE,sparse=TRUE)$design
+  G.dense <- crossprod(B.dense) / nrow(B.dense)
+  eig_G <- eigen(G.dense, symmetric = T)
+  G_half <- eig_G$vectors %*% diag(sqrt(eig_G$values)) %*% t(eig_G$vectors)
+  G_invhalf <- eig_G$vectors %*% diag(1/sqrt(eig_G$values)) %*% t(eig_G$vectors)
+  #Bnew <- as.matrix(B %*% G_invhalf) #deleted 2/27/2023
+  A0tilde <- G_half %*% A0
+  
   ######## precalculation for missing data ########
   imputation <- FALSE
   Niter.miss <- 1
-
+  
   Index.miss <- is.na(Y)
+  num.miss <- rowSums(is.na(Y))
   if(sum(Index.miss)>0){
-    num.miss <- rowSums(is.na(Y))
     for(i in 1:I){
       if(num.miss[i]>0){
         y <- Y[i,]
@@ -231,21 +253,21 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
         Y[i,seq2] <- temp
       }
     }
-    Y0 <- matrix(NA,c.p,I)
     imputation <- TRUE
     Niter.miss <- 100
   }
   convergence.vector <- rep(0,Niter.miss);
   iter.miss <- 1
   totalmiss <- mean(Index.miss)
-
+  
   while(iter.miss <= Niter.miss&&convergence.vector[iter.miss]==0) {
     ###################################################
     ######## Transform the Data           #############
     ###################################################
-    Ytilde <- as.matrix(t(A0)%*%as.matrix(Bt%*%t(Y)))
+    BtYt <- Bt%*%t(Y)
+    Ytilde <- as.matrix(t(A0)%*%BtYt)
     C_diag <- rowSums(Ytilde^2)
-    if(iter.miss==1) Y0 = Ytilde
+    
     ###################################################
     ########  Select Smoothing Parameters #############
     ###################################################
@@ -259,7 +281,7 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
       gcv <- gcv/(1-alpha*trace/J/(1-totalmiss))^2
       return(gcv)
     }
-
+    
     if(is.null(lambda)) {
       if(!search.grid){
         fit <- optim(0,face_gcv,method=method,lower=lower,upper=upper,control=control)
@@ -267,7 +289,7 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
           expression <- paste("Smoothing failed! The code is:",fit$convergence)
           print(expression)
         }
-
+        
         lambda <- exp(fit$par)
       } else {
         Lambda <- seq(lower,upper,length=search.length)
@@ -280,60 +302,77 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
       }
     }
     YS <- MM(Ytilde,1/(1+lambda*s),2)
-
+    
     ###################################################
     ####  Eigendecomposition of Smoothed Data #########
     ###################################################
-    if(c.p <= I){
-      temp <- YS%*%t(YS)/I
-      Eigen <- eigen(temp,symmetric=TRUE)
-      A <- Eigen$vectors
-      Sigma <- Eigen$values/J
-    } else {
-      temp <- t(YS)%*%YS/I
-      Eigen <- eigen(temp,symmetric=TRUE)
-      Sigma <- Eigen$values/J
-      #N <- sum(Sigma>0.0000001)
-      A <- YS%*%(Eigen$vectors%*%diag(1/sqrt(Eigen$values)))/sqrt(I)
-    }
+    
+    temp0 <- tcrossprod(YS)/I
+    temp <- as.matrix(A0tilde%*%temp0%*%t(A0tilde))
+    Eigen <- eigen(temp,symmetric=TRUE)
+    A <- Eigen$vectors
+    Sigma <- Eigen$values
+    G_invhalfA <- G_invhalf%*%A
+    Theta <- G_invhalfA%*%diag(Sigma)%*%t(G_invhalfA)
+    PhitYt <- t(G_invhalfA)%*%BtYt
+    PhitPhi <- t(G_invhalfA)%*%G%*%G_invhalfA* nrow(B)
+    Phi <- as.matrix(B%*% (G_invhalfA)) 
+    
+    
     if(iter.miss>1&&iter.miss< Niter.miss) {
       diff <- norm(YS-YS.temp,"F")/norm(YS,"F")
       if(diff <= 0.02)
         convergence.vector[iter.miss+1] <- 1
     }
-
+    
     YS.temp <- YS
     iter.miss <- iter.miss + 1
     N <- min(I,c.p)
     d <- Sigma[1:N]
     d <- d[d>0]
     per <- cumsum(d)/sum(d)
-
     N <- ifelse (is.null(npc), min(which(per>pve)), min(npc, length(d)))
-
-    #print(c(iter.miss,convergence.vector[iter.miss+1],lambda,diff))
+    
     #########################################
     #######     Principal  Scores   #########
     ########   data imputation      #########
     #########################################
-
+    
     if(imputation) {
-      A.N <- A[,1:N]
+      #Phi.N <- Phi[,1:N]
+      A.N <- G_invhalfA[,1:N]
+      PhitYt.N <- PhitYt[1:N,]
+      PhitPhi.N <- PhitPhi[1:N,1:N]
       d <- Sigma[1:N]
-      sigmahat2  <-  max(mean(Y[!Index.miss]^2) -sum(Sigma),0)
-      Xi <- t(A.N)%*%Ytilde
-      Xi <- t(as.matrix(B%*%(A0%*%((A.N%*%diag(d/(d+sigmahat2/J)))%*%Xi))))
-      Y <- Y*(1-Index.miss) + Xi*Index.miss
+      sigmahat2  <-  max(mean(Y[!Index.miss]^2)-sum(Sigma),0)
+      #Xi1 = t(Y%*%Phi.N)
+      if(N>1){
+        Xi <- solve(PhitPhi.N + diag(sigmahat2/d)) %*% PhitYt.N
+      } else{
+        Xi <- solve(PhitPhi.N + sigmahat2/d) %*% PhitYt.N
+      }
+      #Yhat <- t(Phi.N %*% Xi)
+      G_invhalfAXi <- A.N%*%Xi
+      Yhat <- t(as.matrix(B%*%G_invhalfAXi))
+      Y <- Y*(1-Index.miss) + Yhat*Index.miss
       if(sum(is.na(Y))>0)
         print("error")
     }
     #if(iter.miss%%10==0) print(iter.miss)
   } ## end of while loop
-
+  
   ### now calculate scores
-  if(is.null(Y.pred)) Y.pred = Y
-  else {Y.pred = t(t(as.matrix(Y.pred))-meanX)}
-
+  if(is.null(Y.pred)) {
+    Y.pred = Y
+  } 
+  else{
+    Y.pred = t(t(as.matrix(Y.pred))-meanX)
+    Index.miss = is.na(Y.pred)
+    num.miss <- rowSums(is.na(Y.pred))
+    I = nrow(Y.pred)
+  }
+  
+  
   N <- ifelse (is.null(npc), min(which(per>pve)), npc)
   if (N>ncol(A)) {
     warning(paste0("The requested npc of ", npc,
@@ -341,32 +380,56 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
                    ncol(A), ". Using ", ncol(A), "."))
     N <- ncol(A)
   }
-
+  
   npc <- N
-
-  Ytilde <- as.matrix(t(A0)%*%(Bt%*%t(Y.pred)))
+  Phi.N <- Phi[,1:N]
+  A.N <- G_invhalfA[,1:N]
+  PhitYt.N <- PhitYt[1:N,]
+  PhitPhi.N <- PhitPhi[1:N,1:N]
+  d <- Sigma[1:N]
   sigmahat2 <- max(mean(Y[!Index.miss]^2) -sum(Sigma),0)
-  Xi <- t(Ytilde)%*%(matrix(A[,1:N], ncol = N)/sqrt(J))
-  Xi <- MM(Xi,Sigma[1:N]/(Sigma[1:N] + sigmahat2/J))
-
-  eigenvectors = as.matrix(B%*%(A0%*% matrix(A[,1:N], ncol = N)))
-  eigenvalues = Sigma[1:N]
-
-  Yhat <- t(matrix(A[,1:N], ncol = N))%*%Ytilde
-  if(N > 1){
-    Yhat <- as.matrix(B %*%( A0%*%matrix(A[,1:N], ncol = N) %*% diag(eigenvalues/(eigenvalues+sigmahat2/J))%*%Yhat ) )
-  }else{
-    Yhat <- as.matrix(B %*%( A0 %*% matrix(A[,1:N], ncol = N)  %*% Yhat * eigenvalues/(eigenvalues+sigmahat2/J)))
+  
+  Y.pred[Index.miss] = 0
+  temp = as.matrix(t(A.N)%*%Bt%*%t(Y.pred))
+  if(N>1) {
+    Xi <- solve(PhitPhi.N + diag(sigmahat2/d)) %*% temp
+  } else {
+    Xi <- solve(PhitPhi.N + sigmahat2/d) %*% temp
   }
+  
+  
+  # If the data are incomplete
+  if(sum(num.miss) > 0){
+    if(N>1){
+      for (i in 1:I) {
+        if(num.miss[i] > 0){
+          Phi.obs <- Phi.N[!Index.miss[i,],]
+          Xi[,i] <- solve(t(Phi.obs)%*%Phi.obs + diag(sigmahat2/d)) %*% temp[,i]
+        }
+      }
+    } else{
+      for (i in 1:I) {
+        if(num.miss[i] > 0){
+          Phi.obs <- Phi.N[!Index.miss[i,],]
+          Xi[,i] <- solve(t(Phi.obs)%*%Phi.obs + sigmahat2/d) %*% temp[,i]
+        }
+      }
+    }
+  }
+  
+  
+  efunctions = Phi.N / sqrt(J) 
+  evalues = d * J
+  
+  #Yhat <- Phi.N %*% Xi
+  G_invhalfAXi <- A.N%*%Xi
+  Yhat <- t(as.matrix(B%*%G_invhalfAXi))
   Yhat <- t(Yhat + meanX)
-
-
-  scores <- sqrt(J)*Xi[,1:N]
+  
+  scores <- t(Xi)
   mu <- meanX
-  efunctions <- eigenvectors[,1:N]
-  evalues <- J*eigenvalues[1:N]
   pve  <- per[N]
-
+  
   ret.objects <- c("Yhat", "Y", "scores", "mu", "efunctions", "evalues", "npc", "pve")
   if(var) {
     sigma2 = sigmahat2
@@ -374,12 +437,16 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
     diag.var = matrix(NA, nrow=I,ncol=J)
     crit.val = rep(0,I)
     for(i.subj in 1:I){
-      temp = sigma2*eigenvectors%*%solve(t(eigenvectors)%*%eigenvectors + sigma2*diag(eigenvalues))%*%t(eigenvectors)
+      if(N >1){
+        temp = sigma2*efunctions%*%solve(t(efunctions)%*%efunctions + sigma2*diag(evalues))%*%t(efunctions)
+      } else{
+        temp = sigma2*efunctions%*%solve(t(efunctions)%*%efunctions + sigma2*evalues)%*%t(efunctions)
+      }
       VarMats[[i.subj]] = temp
       diag.var[i.subj,] = diag(temp)
       if (simul & sigma2 != 0) {
         norm.samp = mvrnorm(2500, mu = rep(0, J), Sigma = VarMats[[i.subj]])/matrix(sqrt(diag(VarMats[[i.subj]])),
-                                                  nrow = 2500, ncol = J, byrow = TRUE)
+                                                                                    nrow = 2500, ncol = J, byrow = TRUE)
         crit.val[i.subj] = quantile(apply(abs(norm.samp), 1, max), sim.alpha)
       }
     }
@@ -392,6 +459,17 @@ function(Y=NULL,ydata=NULL,Y.pred = NULL,argvals=NULL,pve = 0.99, npc  = NULL,
   ret = lapply(1:length(ret.objects), function(u) get(ret.objects[u]))
   names(ret) = ret.objects
   class(ret) = "fpca"
-  return(ret)
-
+  obj = c(ret, 
+          list("mean.fit" = mean.fit,
+             "argvals" = argvals,
+             "knots" = knots,
+             "p" = p.p,
+             "m" = m.p,
+             "G" = G,
+             "G_invhalf" = G_invhalf,
+             "G_invhalfA" = G_invhalfA,
+             "Theta" = Theta
+  ))
+  return(obj)
+  
 }

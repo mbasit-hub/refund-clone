@@ -34,7 +34,7 @@
 #'  evaluations of orthonormal functions if \code{argvals} is not equidistant),
 #'  \code{evalues}, their associated eigenvalues, and \code{npc}, the number of
 #'  smooth components that were extracted.
-##' @author Luo Xiao \email{lxiao@@jhsph.edu}, Fabian Scheipl
+##' @author Luo Xiao \email{lxiao5@@ncsu.edu}, Fabian Scheipl
 ##' @export
 ##' @importFrom stats smooth.spline
 ##' @importFrom stats lm.fit

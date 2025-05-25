@@ -123,5 +123,5 @@ on smoothing a covariance estimate; \code{\link{fpca.ssvd}} for another
 SVD-based approach.
 }
 \author{
-Luo Xiao \email{lxiao@jhsph.edu}, Fabian Scheipl
+Luo Xiao \email{lxiao5@ncsu.edu}, Fabian Scheipl
 }

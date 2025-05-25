@@ -30,7 +30,7 @@
 ##' smoothing parameters} \item{Yhat}{fitted data} \item{trace}{trace of the
 ##' overall smoothing matrix} \item{gcv}{value of generalized cross validation}
 ##' \item{Theta}{matrix of estimated coefficients}
-##' @author Luo Xiao \email{lxiao@@jhsph.edu}
+##' @author Luo Xiao \email{lxiao5@@ncsu.edu}
 ##' @export
 ##' @importFrom Matrix kronecker as.matrix
 ##' @references Xiao, L., Li, Y., and Ruppert, D. (2013). Fast bivariate

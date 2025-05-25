@@ -9,7 +9,7 @@
 #' @return A list with components \item{x}{a vector of x given in newdata}
 #' \item{z}{a vector of z given in newdata} \item{fitted.values}{a vector of
 #'  fitted values corresponding to x and z given in newdata} 
-#' @author Luo Xiao \email{lxiao@@jhsph.edu}
+#' @author Luo Xiao \email{lxiao5@@ncsu.edu}
 #' @export
 #' @importFrom Matrix kronecker as.matrix
 #' @references Xiao, L., Li, Y., and Ruppert, D. (2013). Fast bivariate
