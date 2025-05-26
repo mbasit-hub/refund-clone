@@ -62,18 +62,18 @@
 #' \item \code{scores} - matrix of scores
 #' \item \code{mu} - mean function
 #' \item \code{npc} - number of principal components
-#' \item \code{efunctions} - matrix of eigenvectors
-#' \item \code{evalues} - vector of eigenvalues
+#' \item \code{efunctions} - matrix of eigenvectors (scaled eigenfunctions, i.e., eigenfunctions divided by square root of number of time points)
+#' \item \code{evalues} - vector of eigenvalues (scaled eigenvalues, i.e., eigenvalues multiplied by number of time points)
 #' \item \code{pve} - the percent variance explained by the returned number of PCs
 #' \item \code{mean.fit} - an object of class \code{\link[stats]{smooth.spline}}; used to center the observed functional data if \code{center == TRUE}
 #' \item \code{argvals} - the supplied value of \code{argvals}
 #' \item \code{knots} - vector of knots used to specify the B-spline basis
 #' \item \code{p} - the supplied value of \code{p}
 #' \item \code{m} - the supplied value of \code{m}
-#' \item \code{G} - matrix of the integral of B-spline basis function products; used for orthonormalization
+#' \item \code{G} - Gram matrix of B-spline basis functions; used for orthonormalization
 #' \item \code{G_invhalf} - the inverse square root of \code{G}
 #' \item \code{G_invhalfA} - matrix producct of \code{G_invhalf} and the eigenvectors of the smoothed data
-#' \item \code{Theta} - matrix of estimated smoothing coefficients
+#' \item \code{Theta} - matrix of estimated smoothing coefficients with each column B-spline coefficients of eigenfunctions
 #' }
 #' if \code{var == TRUE} additional components are returned
 #' \enumerate{
