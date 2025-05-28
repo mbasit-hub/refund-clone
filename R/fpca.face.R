@@ -73,7 +73,7 @@
 #' \item \code{G} - Gram matrix of B-spline basis functions; used for orthonormalization
 #' \item \code{G_invhalf} - the inverse square root of \code{G}
 #' \item \code{G_invhalfA} - matrix producct of \code{G_invhalf} and the eigenvectors of the smoothed data
-#' \item \code{Theta} - matrix of estimated smoothing coefficients with each column B-spline coefficients of eigenfunctions
+#' \item \code{Theta} - matrix of estimated smoothing coefficients with each column containing B-spline coefficients of eigenfunctions
 #' }
 #' if \code{var == TRUE} additional components are returned
 #' \enumerate{
